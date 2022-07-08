@@ -1,0 +1,120 @@
+// define var
+Input									
+UP_Call_Lst	Array[0..10] of Bool		Non-retain	TRUE	TRUE	TRUE	FALSE		厢外上行呼叫
+DOWN_Call_Lst	Array[0..10] of Bool		Non-retain	TRUE	TRUE	TRUE	FALSE		厢外下行呼叫
+Lift_Call_Lst	Array[0..10] of Bool		Non-retain	TRUE	TRUE	TRUE	FALSE		厢内楼层呼叫
+Current_Floor	Int	0	Non-retain	TRUE	TRUE	TRUE	FALSE		当前楼层
+Output									
+Current_Direction	Int	0	Non-retain	TRUE	TRUE	TRUE	FALSE		电梯运行状态
+Target_Floor	Int	0	Non-retain	TRUE	TRUE	TRUE	FALSE		目标楼层
+Temp									
+i	Int								
+temp_var	Bool								
+flag	Bool								
+
+
+// code
+
+CASE #Current_Direction OF
+    0:  // 闲置状态
+        FOR #i := 0 TO 10 DO  //依次判断每一层是否有呼叫
+            #temp_var := #UP_Call_Lst[#i] OR #DOWN_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                IF #Current_Floor < #i THEN  //根据呼叫层与当前层关系,设定运行方向
+                    #Current_Direction := 1;
+                    RETURN;
+                ELSIF #Current_Floor > #i THEN
+                    #Current_Direction := -1;
+                    RETURN;
+                ELSIF #Current_Floor = #i THEN
+                    #Current_Direction := 0;
+                    #Target_Floor := #Current_Floor;
+                    RETURN;
+                END_IF;
+            END_IF;
+        END_FOR;
+        #Target_Floor := 0;
+        
+    1:  // UP
+        FOR #i := 0 TO 10 DO //判断是否有呼叫信号
+            #temp_var := #UP_Call_Lst[#i] OR #DOWN_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                #flag := 1;
+                EXIT;
+            END_IF;
+        END_FOR;
+        IF NOT #flag THEN//如果没有呼叫信号，则电梯运行状态转为0，且目标状态转为当前楼层
+            #Current_Direction := 0;
+            #Target_Floor := #Current_Floor;
+            RETURN;
+            
+        END_IF;
+        
+        
+        FOR #i := #Current_Floor TO 10 DO //UP状态响应：更高楼层的UP呼叫、箱内更高楼层呼叫
+            
+            #temp_var := #UP_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                #Target_Floor := #i;
+                RETURN;
+            END_IF;
+        END_FOR;
+        
+        FOR #i := 10 TO #Current_Floor BY -1 DO //UP状态响应:最高层的下行呼叫（如果有）        
+            
+            IF #DOWN_Call_Lst[#i] THEN
+                #Target_Floor := #i;
+                RETURN;
+            END_IF;
+        END_FOR;
+        
+        FOR #i := #Current_Floor TO 0 BY -1 DO
+            #temp_var := #UP_Call_Lst[#i] OR #DOWN_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                #Current_Direction:=-1;
+                RETURN;
+            END_IF;
+        END_FOR;
+        
+    -1://DOWN
+        FOR #i := 0 TO 10 DO //判断是否有呼叫信号
+            #temp_var := #UP_Call_Lst[#i] OR #DOWN_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                #flag := 1;
+                EXIT;
+            END_IF;
+        END_FOR;
+        IF NOT #flag THEN //没有呼叫信号时电梯运行状态置零，目标楼层转为当前楼层，并跳出
+            #Current_Direction := 0;
+            #Target_Floor := #Current_Floor;
+            RETURN;
+        END_IF;
+        
+        
+        FOR #i := #Current_Floor TO 0 BY -1 DO //DOWN状态响应：更低楼层的DOWN呼叫、箱内更低楼层呼叫
+            #temp_var := #DOWN_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                #Target_Floor := #i;
+                RETURN;
+            END_IF;
+        END_FOR;
+        
+        FOR #i := 0 TO #Current_Floor DO //DOWN状态响应:最低层的UP呼叫（如果有）  
+            IF #UP_Call_Lst[#i] THEN
+                #Target_Floor := #i;
+                RETURN;
+            END_IF;
+        END_FOR;
+        
+        FOR #i := #Current_Floor TO 10 DO
+            #temp_var := #UP_Call_Lst[#i] OR #DOWN_Call_Lst[#i] OR #Lift_Call_Lst[#i];
+            IF #temp_var THEN
+                #Current_Direction := 1;
+                RETURN;
+            END_IF;
+        END_FOR;
+
+    ELSE  // 电梯还应有检修等其他状态 TODO
+        #Current_Direction := 0;
+        
+END_CASE;
